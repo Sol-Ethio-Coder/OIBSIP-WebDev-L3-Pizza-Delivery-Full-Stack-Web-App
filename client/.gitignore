@@ -1,0 +1,5 @@
+# OS/editor junk (project-wide)
+.DS_Store
+.vscode/
+.idea/
+*.log
