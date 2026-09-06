@@ -1,32 +1,34 @@
-const nodemailer = require('nodemailer');
-
-const port = Number(process.env.EMAIL_PORT) || 587;
-
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port,
-  secure: port === 465, // true for 465 (implicit SSL), false for 587 (STARTTLS)
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  connectionTimeout: 10000, // 10s to establish the connection
-  greetingTimeout: 10000,   // 10s to get the server greeting
-  socketTimeout: 15000      // 15s of inactivity before giving up
-});
+// Sends email via the Resend HTTPS API instead of raw SMTP.
+// Render (and several other free-tier hosts) block outbound SMTP connections
+// entirely, so nodemailer over SMTP times out no matter the port. Resend's
+// API runs over normal HTTPS (443), which isn't blocked the same way.
+const RESEND_API_URL = 'https://api.resend.com/emails';
 
 async function sendEmail({ to, subject, html }) {
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to,
-      subject,
-      html
+    const res = await fetch(RESEND_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || 'Forno Pizza <onboarding@resend.dev>',
+        to,
+        subject,
+        html
+      })
     });
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error('Email send failed:', res.status, errorBody);
+      return false;
+    }
+
     return true;
   } catch (err) {
-    // Don't let a broken mail server take down a request — log and continue.
-    console.error('Email send failed:', err.message);
+    console.error('Email send failed:', err.message, err.cause || '');
     return false;
   }
 }
