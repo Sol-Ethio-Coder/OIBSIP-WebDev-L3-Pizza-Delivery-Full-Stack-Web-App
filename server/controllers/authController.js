@@ -89,6 +89,38 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
+exports.resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const genericMessage = 'If that email is registered and unverified, a new link has been sent.';
+
+    const user = await User.findOne({ email: (email || '').toLowerCase() });
+    if (!user || user.isVerified) {
+      // Same response either way — don't reveal account existence/status.
+      return res.json({ message: genericMessage });
+    }
+
+    const verificationToken = makeToken();
+    user.verificationToken = verificationToken;
+    user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+    await user.save();
+
+    const verifyUrl = `${CLIENT_URL}/verify-email?token=${verificationToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your email — Pizza App',
+      html: `<p>Hi ${user.name},</p>
+             <p>Here's a new verification link:</p>
+             <p><a href="${verifyUrl}">${verifyUrl}</a></p>
+             <p>This link expires in 24 hours.</p>`
+    });
+
+    res.json({ message: genericMessage });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not process request.', error: err.message });
+  }
+};
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;

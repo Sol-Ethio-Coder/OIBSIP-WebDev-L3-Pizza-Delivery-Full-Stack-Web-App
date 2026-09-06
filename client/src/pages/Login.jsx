@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext';
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState(null);
+  const [isUnverified, setIsUnverified] = useState(false);
+  const [resendStatus, setResendStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const { loginUser } = useAuth();
   const navigate = useNavigate();
@@ -13,6 +15,8 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    setIsUnverified(false);
+    setResendStatus(null);
 
     if (!form.email || !form.password) {
       setError('Please enter both fields.');
@@ -26,8 +30,19 @@ export default function Login() {
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed.');
+      if (err.response?.status === 403) setIsUnverified(true);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    setResendStatus('sending');
+    try {
+      const res = await api.post('/auth/resend-verification', { email: form.email });
+      setResendStatus(res.data.message);
+    } catch (err) {
+      setResendStatus(err.response?.data?.message || 'Could not resend right now.');
     }
   }
 
@@ -42,6 +57,22 @@ export default function Login() {
           </p>
 
           {error && <p className="message message--error">{error}</p>}
+
+          {isUnverified && (
+            <p className="switch" style={{ marginTop: -10, marginBottom: 18 }}>
+              {resendStatus ? (
+                resendStatus
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  style={{ background: 'none', border: 'none', color: 'var(--tomato)', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit' }}
+                >
+                  Resend verification email
+                </button>
+              )}
+            </p>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className="field">
