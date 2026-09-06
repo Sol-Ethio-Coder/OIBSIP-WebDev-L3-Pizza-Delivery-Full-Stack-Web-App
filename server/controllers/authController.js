@@ -37,7 +37,7 @@ exports.register = async (req, res) => {
     });
 
     const verifyUrl = `${CLIENT_URL}/verify-email?token=${verificationToken}`;
-    await sendEmail({
+    const emailSent = await sendEmail({
       to: user.email,
       subject: 'Verify your email — Pizza App',
       html: `<p>Hi ${user.name},</p>
@@ -45,6 +45,16 @@ exports.register = async (req, res) => {
              <p><a href="${verifyUrl}">${verifyUrl}</a></p>
              <p>This link expires in 24 hours.</p>`
     });
+
+    if (!emailSent) {
+      // Account was created, but be honest that the email didn't go out —
+      // silently claiming success here is what makes broken email config
+      // invisible. Check the server logs for the underlying nodemailer error.
+      return res.status(201).json({
+        message:
+          'Account created, but the verification email could not be sent. Please contact support or try registering again once email delivery is fixed.'
+      });
+    }
 
     res.status(201).json({
       message: 'Registered. Please check your email to verify your account.'
